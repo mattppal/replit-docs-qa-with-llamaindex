@@ -5,13 +5,12 @@ import sys
 
 import streamlit as st
 from llama_index import (
-  VectorStoreIndex,
-)
+    VectorStoreIndex, )
 from llama_index.agent import FnRetrieverOpenAIAgent
 from llama_index.llms import OpenAI
 from llama_index.objects import (
-  ObjectIndex,
-  SimpleToolNodeMapping,
+    ObjectIndex,
+    SimpleToolNodeMapping,
 )
 from llama_index.tools import QueryEngineTool, ToolMetadata
 
@@ -23,7 +22,7 @@ logging.basicConfig(stream=sys.stdout, level=20)
 
 logger = logging.getLogger(__name__)
 
-DEBUG = True
+DEBUG = False
 
 if 'OPENAI_API_KEY' not in os.environ:
   sys.stderr.write("""
@@ -53,6 +52,10 @@ st.markdown("""
 
 ### 👨‍💻 Intro
 
+This app builds a multi-document agent that can answer a few different quesetions about the provided documentation.
+
+It first extracts the provided domain using `wget`. 
+
 We build a top-level agent that can orchestrate across the different document agents to answer any user query.
 
 This `RetrieverOpenAIAgent` performs tool retrieval before tool use (unlike a default agent that tries to put all tools in the prompt).
@@ -68,14 +71,17 @@ Adding in a query planning tool: we add an explicit query planning tool that’s
 def st_build_agents(_docs):
   return asyncio.run(build_agents(_docs))
 
+
 @st.cache_resource
 def build_base_engine(_extra_info_dict):
   all_nodes = [
-    n for extra_info in _extra_info_dict.values() for n in extra_info["nodes"]
+      n for extra_info in _extra_info_dict.values()
+      for n in extra_info["nodes"]
   ]
 
   base_index = VectorStoreIndex(all_nodes)
   return base_index.as_query_engine(similarity_top_k=4)
+
 
 # @st.cache_resource
 def build_tools(_agents_dict, _extra_info_dict):
@@ -91,9 +97,7 @@ def build_tools(_agents_dict, _extra_info_dict):
         ),
     )
     all_tools.append(doc_tool)
-  
-  logger.info(all_tools[0].metadata)
-  
+
   return all_tools
 
 
@@ -101,20 +105,20 @@ def build_custom_retriever(all_tools):
   tool_mapping = SimpleToolNodeMapping.from_objects(all_tools)
 
   obj_index = ObjectIndex.from_objects(
-    all_tools,
+      all_tools,
       tool_mapping,
       VectorStoreIndex,
   )
   vector_node_retriever = obj_index.as_node_retriever(similarity_top_k=10)
 
-  return CustomObjectRetriever(
-      CustomRetriever(vector_node_retriever), tool_mapping, all_tools)
+  return CustomObjectRetriever(CustomRetriever(vector_node_retriever),
+                               tool_mapping, all_tools)
 
 
 def build_top_agent(_custom_obj_retriever, _llm):
-  
+
   return FnRetrieverOpenAIAgent.from_retriever(
-    _custom_obj_retriever,
+      _custom_obj_retriever,
       system_prompt=""" \
   You are an agent designed to answer queries about the documentation.
   Please always use the tools provided to answer a question. Do not rely on prior knowledge.\
@@ -123,18 +127,22 @@ def build_top_agent(_custom_obj_retriever, _llm):
       verbose=True,
   )
 
+
 @st.cache_resource
 def get_base_user_query(user_input):
   return base_query_engine.query(user_input)
+
 
 @st.cache_resource
 def get_top_agent_query(user_input):
   return top_agent.query(user_input)
 
+
 @st.cache_resource
 def index_docs(docs_user_input):
   r = DocsLoader(docs_user_input, docs_limit=5 if DEBUG else 500)
   return r.index_docs()
+
 
 docs_user_input = st.sidebar.text_input("Docs Site", "docs.replit.com")
 
@@ -161,7 +169,7 @@ def build_from_input(docs_user_input):
 
   llm = OpenAI(model_name="gpt-4-0613")
   docs = index_docs(docs_user_input)
-  
+
   agents_dict, extra_info_dict = st_build_agents(docs)
   base_query_engine = build_base_engine(extra_info_dict)
 
@@ -171,6 +179,7 @@ def build_from_input(docs_user_input):
 
   top_agent = build_top_agent(custom_obj_retriever, llm)
   return top_agent, base_query_engine
+
 
 top_agent, base_query_engine = build_from_input(docs_user_input)
 
@@ -187,7 +196,9 @@ if st.button("Submit"):
   st.write(f"Your Query: {user_input}")
 
   with st.spinner("Thinking..."):
-    result = get_base_user_query(user_input) if query_type == 'Base Engine' else get_top_agent_query(user_input)
+    result = get_base_user_query(
+        user_input) if query_type == 'Base Engine' else get_top_agent_query(
+            user_input)
 
     # Display the results
     st.write(f"Answer: {str(result)}")
