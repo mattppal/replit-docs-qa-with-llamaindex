@@ -1,15 +1,24 @@
-from llama_index.llms import OpenAI
-from llama_index import ServiceContext
-from llama_index import VectorStoreIndex, SummaryIndex
-from llama_index.agent import OpenAIAgent
-from llama_index import load_index_from_storage, StorageContext
-from llama_index.tools import QueryEngineTool, ToolMetadata
-from llama_index.node_parser import SentenceSplitter
 import os
-from pathlib import Path
 import pickle
+from pathlib import Path
 
-from llama_index import VectorStoreIndex
+from llama_index import (
+    ServiceContext,
+    StorageContext,
+    SummaryIndex,
+    VectorStoreIndex,
+    load_index_from_storage,
+)
+from llama_index.agent import OpenAIAgent
+from llama_index.llms import OpenAI
+from llama_index.node_parser import SentenceSplitter
+from llama_index.tools import QueryEngineTool, ToolMetadata
+import logging
+import sys
+
+logging.basicConfig(stream=sys.stdout, level=20)
+
+logger = logging.getLogger(__name__)
 
 llm = OpenAI(temperature=0, model="gpt-3.5-turbo")
 service_context = ServiceContext.from_defaults(llm=llm)
@@ -49,9 +58,11 @@ async def build_agent_per_doc(nodes, file_base):
                 "Extract a concise 1-2 line summary of this document"
             )
         )
-        pickle.dump(summary, open(summary_out_path, "wb"))
+        with open(summary_out_path, "wb") as f:
+          pickle.dump(summary, f)
     else:
-        summary = pickle.load(open(summary_out_path, "rb"))
+        with open(summary_out_path, "rb") as f:
+          summary = pickle.load(f)
 
     # define tools
     query_engine_tools = [
@@ -59,14 +70,14 @@ async def build_agent_per_doc(nodes, file_base):
             query_engine=vector_query_engine,
             metadata=ToolMetadata(
                 name=f"vector_tool_{file_base}",
-                description=f"Useful for questions related to specific facts",
+                description="Useful for questions related to specific facts",
             ),
         ),
         QueryEngineTool(
             query_engine=summary_query_engine,
             metadata=ToolMetadata(
                 name=f"summary_tool_{file_base}",
-                description=f"Useful for summarization questions",
+                description="Useful for summarization questions",
             ),
         ),
     ]
@@ -94,18 +105,18 @@ async def build_agents(docs):
     extra_info_dict = {}
 
     # # this is for the baseline
-    # all_nodes = []
 
-    for idx, doc in enumerate(tqdm(docs)):
-        nodes = node_parser.get_nodes_from_documents([doc])
-        # all_nodes.extend(nodes)
+    for idx, doc in enumerate(docs):
+      logger.info(f"Idx {idx}/{len(docs)}")
+      
+      nodes = node_parser.get_nodes_from_documents([doc])
 
-        # ID will be base + parent
-        file_path = Path(doc.metadata["path"])
-        file_base = str(file_path.parent.stem) + "_" + str(file_path.stem)
-        agent, summary = await build_agent_per_doc(nodes, file_base)
+      # ID will be base + parent
+      file_path = Path(doc.metadata["path"])
+      file_base = str(file_path.parent.stem) + "_" + str(file_path.stem)
+      agent, summary = await build_agent_per_doc(nodes, file_base)
 
-        agents_dict[file_base] = agent
-        extra_info_dict[file_base] = {"summary": summary, "nodes": nodes}
+      agents_dict[file_base] = agent
+      extra_info_dict[file_base] = {"summary": summary, "nodes": nodes}
 
     return agents_dict, extra_info_dict

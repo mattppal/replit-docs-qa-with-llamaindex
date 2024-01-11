@@ -1,10 +1,10 @@
 import logging
 import subprocess
-from pathlib import Path
 import sys
-from llama_index import Document
-from llama_hub.file.unstructured.base import UnstructuredReader
 from pathlib import Path
+
+from llama_hub.file.unstructured.base import UnstructuredReader
+from llama_index import Document
 
 logging.basicConfig(stream=sys.stdout, level=20)
 
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 class DocsLoader:
 
-  def __init__(self, domain, docs_url=None, docs_limit=400, start_idx=72):
+  def __init__(self, domain, docs_url=None, docs_limit=500, start_idx=72):
     self.domain = domain
 
     if docs_url:
@@ -51,7 +51,7 @@ class DocsLoader:
     return [f for f in all_files if f.suffix.lower() == ".html"]
 
   def index_docs(self):
-    all_html_files = self.get_html_files()[:20]
+    all_html_files = self.get_html_files()
 
     docs = []
     reader = UnstructuredReader()
