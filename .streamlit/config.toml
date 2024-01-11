@@ -1,0 +1,6 @@
+[server]
+headless = true
+enableWebsocketCompression = false
+
+[browser]
+gatherUsageStats = false
